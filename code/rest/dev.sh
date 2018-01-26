@@ -18,7 +18,7 @@ case "$CMD" in
 		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main -a -tags netgo .
 	;;
 	buildPush)
-		docker build -t mateuszdyminski/rest:latest . && docker push mateuszdyminski/rest
+		docker build -t 'mateuszdyminski/rest:latest' . && docker push 'mateuszdyminski/rest:latest'
 	;;
 	*)
 		usage
