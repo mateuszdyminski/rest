@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rest-api
+  namespace: rest
+  labels:
+    app: rest-api
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+  selector:
+    app: rest-api

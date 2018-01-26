@@ -1,0 +1,470 @@
+#+theme=nokia
+
+How to write fast, efficiency HTTP REST service
+
+Mateusz Dymiński
+Nokia
+
+[[github.com/mateuszdyminski/rest][github.com/mateuszdyminski/rest]]
+@m_dyminski
+
+* Agenda
+
+1. What's REST?
+2. HATEOAS
+3. HTTP REST good practices
+4. HTTP REST performance tricks
+5. HTTP monitoring
+6. HTTP performance testing
+
+
+* What's REST?
+
+In "REST API", "REST" stands for "Representational State Transfer", which is the software architectural style of the web. Basically, this means that any REST API relies on the HTTP protocol (and by extension HTTPS).
+
+* It's all about resources
+
+URLs (Uniform Resource Locator) represent resources. When designing an API, think about it as resource containers. Every end-point should represent either a resource or a list of resources.
+
+Examples:
+
+    GET    http://localhost:8080/users           <- get all users
+    GET    http://localhost:8080/users/{id}      <- get single user
+    POST   http://localhost:8080/users           <- create user
+    PUT    http://localhost:8080/users/{id}      <- update user
+    DELETE http://localhost:8080/users/{id}      <- delete user
+    PATCH  http://localhost:8080/users/{id}      <- update user - only specified fields
+
+* It's all about resources
+
+    GET    http://localhost:8080/users/{id}      <- get single user
+
+The important thing here, is to understand that {id} is a resource's unique identifier. For users, we retrieved these unique identifiers thanks to the /users end-point (which had given us the list of users). So, /users/{id} will give us all the details about ONE resource, the targeted user. The same rule applies for any other collection of resources.
+
+* HTTP requests methods
+
+All:
+
+    GET      - is a representation of the specified resource. Requests using GET should only
+                retrieve data.
+    HEAD     - asks for a response identical to that of a GET request, but without the
+                response body.
+    POST     - is used to submit an entity to the specified resource, often causing a change
+                in state or side effects on the server
+    PUT      - replaces all current representations of the target resource with the request
+                payload.
+    DELETE   - deletes the specified resource.
+    CONNECT  - establishes a tunnel to the server identified by the target resource.
+    OPTIONS  - is used to describe the communication options for the target resource.
+    TRACE    - performs a message loop-back test along the path to the target resource.
+    PATCH    - is used to apply partial modifications to a resource.
+
+But usually you will use:
+
+*GET*, *POST*, PUT, DELETE
+
+* HTTP response codes
+
+HTTP response status codes indicate whether a specific HTTP request has been successfully completed. Responses are grouped in five classes: informational responses, successful responses, redirects, client errors, and servers errors.
+
+- 1xx Informational
+    100 - Continue
+- 2xx Success
+    200 - OK
+    201 - Created
+- 3xx Redirection
+    301 - Moved Permanently
+
+* HTTP response codes
+
+- 4xx Client Error
+    400 - Bad Request
+    401 - Unauthorized
+    403 - Forbidden
+    404 - Not Found
+- 5xx Server Error
+    500 - Internal Server Error
+
+* HTTP headers
+
+HTTP headers allow the client and the server to pass additional information with the request or the response. A request header consists of its case-insensitive name followed by a colon ':', then by its value (without line breaks). Leading white space before the value is ignored.
+
+Example:
+
+    POST /users HTTP/1.1
+    Host: example.com
+    Content-Type: application/json
+
+* HTTP headers
+
+More complicated example:
+
+    GET /tutorials/other/top-20-mysql-best-practices/ HTTP/1.1
+    Host: net.tutsplus.com
+    User-Agent: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.5) Gecko/20091102 Firefox/3.5.5 (.NET CLR 3.5.30729)
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+    Accept-Language: en-us,en;q=0.5
+    Accept-Encoding: gzip,deflate
+    Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7
+    Keep-Alive: 300
+    Connection: keep-alive
+    Cookie: PHPSESSID=r2t5uvjq435r4q7ib3vtdjq120
+    Pragma: no-cache
+    Cache-Control: no-cache
+
+See: [[https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers][HTTP headers]]
+
+* HATEOAS
+
+* HATEOAS
+
+A hypermedia-driven site provides information to navigate the site's REST interfaces dynamically by including hypermedia links with the responses. This capability differs from that of SOA-based systems and WSDL-driven interfaces. With SOA, servers and clients usually must access a fixed specification that might be staged somewhere else on the website, on another website, or perhaps distributed by email.
+
+
+Pronunciations of HATEOAS vary. Some people pronounce it as "hate-ee-os," similar to "hideous," or as "hate O-A-S". People also refer to it as a hypermedia-driven system.
+
+* HATEOAS
+
+Let's assume that we have following class:
+
+    class User {
+        String name;
+    }
+
+A HATEOAS-based response would look like this:
+
+    {
+        "name": "Tom",
+        "links": [ {
+            "rel": "self",
+            "href": "http://localhost:8080/users/1"
+        } ]
+    }
+* HATEOAS
+
+Let's assume that we search for users. Response might look like:
+
+    {
+        "content": [ {
+            "firstName": "Tom",
+            "secondName": "Tailor",
+            "links": [ {
+                "rel": "self",
+                "href": "http://localhost:8080/users/45"
+            } ]
+        }, {
+            "firstName": "Tommy",
+            "secondName": "Hilfiger",
+            "links": [ {
+                "rel": "self",
+                "href": "http://localhost:8080/users/89"
+            } ]
+        } ],
+        "links": [ {
+            "rel": "users",
+            "href": "http://localhost:8080/users?nameStartsWith=L&page=1"
+        } ]
+    }
+
+* HATEOAS
+
+HATEOAS is considered the final level of REST. This means that each link is presumed to implement the standard REST verbs of GET, POST, PUT, and DELETE (or a subset). Thus providing the links as shown above gives the client the information they need to navigate the service.
+
+* REST good practices
+
+* Naming convention
+
+- Never user verbs in URL
+    GET    http://localhost:8080/getUsers      BAD
+    GET    http://localhost:8080/users         GOOD
+
+    all verbs in names are represented by HTTP methods { GET, HEAD, POST, PUT, DELETE etc }
+
+- Use plural form
+    GET    http://localhost:8080/user          BAD
+    GET    http://localhost:8080/users         GOOD
+
+- Prefer hyphens over camelCase or underscore
+    GET    http://localhost:8080/user_forms    GOOD
+    GET    http://localhost:8080/userForms     GOOD
+    GET    http://localhost:8080/user-forms    BEST
+
+* Use sub-resources for relations
+
+If a resource is related to another resource use subresources.
+
+    GET /users/711/documents/ Returns a list of documents for user 711
+    GET /users/711/documents/56 Returns document #56 for user 711
+
+* Handle Errors with HTTP status codes
+
+It is hard to work with an API that ignores error handling. Pure returning of a HTTP 500 with a stacktrace is not very helpful.
+
+* Use error payloads
+
+Returning StackTrace is not the best option : )
+
+Good example:
+
+    {
+      "errors": [
+         {
+            "userMessage": "Sorry, the requested resource does not exist",
+            "internalMessage": "No user found in the database",
+            "internalErrorCode": 34,
+            "httpErrorCode": 404
+         }
+      ]
+    }
+
+
+* Version your API
+
+Two common approach:
+
+- http://company.com/api/v2/users
+    GET v2.0/users HTTP/1.1
+    Accept: application/json
+
+or:
+
+- http://company.com/api/users
+    GET /users HTTP/1.1
+    Accept: application/vnd.usersapp-v2+json
+
+or:
+
+- http://company.com/api/users
+    GET /users HTTP/1.1
+    x-app-version: 2.0
+
+* Add a documentation of your API
+
+- Apidoc - [[http://apidocjs.com/][http://apidocjs.com/]]
+- Swagger - [[http://swagger.io/][http://swagger.io/]]
+- Mashape - [[http://Mashape.com][http://Mashape.com]]
+- README - [[http://README.IO][http://README.IO]]
+- Postman - [[https://www.getpostman.com/][https://www.getpostman.com/]]
+
+* Provide paging, filtering & sorting for collections
+
+Paging:
+
+    GET /cars?offset=10&limit=5
+
+Filtering:
+
+    GET /cars?color=red Returns a list of red cars
+    GET /cars?seats<=2 Returns a list of cars with a maximum of 2 seats
+
+Sorting:
+
+    GET /cars?sort=-manufactorer,+model
+
+* REST performance tricks
+
+* JSON serializer
+
+.image images/json-ser.png
+
+* Use caching
+
+HTTP provides a built-in caching framework! All you have to do is include some additional outbound response headers and do a little validation when you receive some inbound request headers.
+
+* Use caching - ETag
+
+In this workflow, for each response, server provides an ETag header in the response. For a specific "version" of the data, ETag has to be unique and constant, until the data changes:
+
+Response:
+
+    HTTP/1.1 200 OK
+    Content-Type: application/vnd.uber+json; charset=UTF-8
+    Expires: Sat, 01 Jan 1970 00:00:00 GMT
+    Pragma: no-cache
+    ETag: "88d979a0a78942b5bda05ace4214556a"
+
+Next request:
+
+    Get /countries HTTP/1.1
+    Host: api.example.org
+    Content-Type: application/vnd.uber+json
+    If-None-Match: "88d979a0a78942b5bda05ace4214556a"
+
+* Use caching - Last-Modified
+
+In this workflow, for each response, server provides a "Last-Modified" header in the response, containing the last date the specific data was modified:
+
+Response:
+
+    HTTP/1.1 200 OK
+    Last-Modified: Mon, 7 Dec 2015 15:29:14 GMT
+    Content-Length: 23456
+    Content-Type: application/vnd.uber+json; charset=UTF-8
+
+Next request:
+
+    Get /countries HTTP/1.1
+    Host: api.example.org
+    Content-Type: application/vnd.uber+json
+    If-Modified-Since: Mon, 7 Dec 2015 15:29:14 GMT
+
+* Use caching
+
+You might use chaching tools in your HTTP REST service.
+
+Instead of make multiple queries to DB we could cache some objects in memory.
+
+Tools:
+
+- Guava
+- Ehcache
+- Infinispan
+- Hazelcast
+- Apache Ignite
+- Redis
+- Memcache
+
+And many, many more
+
+* Compress your JSON
+
+Since JSON is just simple text, you can expect to get up to 90% compression. So use gzip wherever possible when communicating with your web services.
+
+    GET       /users   HTTP/1.1
+    Host:              www.domain.com
+    Accept:            application/json
+    Accept-Encoding:   gzip,compress
+
+* Don’t serialize all fields, null or default values
+
+Check your JSON library settings to see how you can ignore specific fields, omit null values, etc.
+
+* Use shorter field names
+
+Most libraries enable you to specify attributes on your classes to override the names of the fields as they are being serialized. This can allow you to make your field names much smaller when serialized but more human readable in your code. Using smaller field names can give you a 5-10% parsing performance boost.
+
+* Use HTTP/2 over HTTP 1.1
+
+- HTTP 2.0 is a binary protocol
+- Multiplexes numerous streams going over a single (normally TLS-encrypted) TCP connection.
+- Queries multiplexing
+- Headers compression
+- Priority
+- Your server needs to use HTTPS to have HTTP/2
+
+* Use something different that JSON
+
+Another options are:
+
+- BSON
+- MessagePack
+- ProtocolBufferes
+- Avro
+- And many more
+
+* Use something different that JSON
+
+Ser Time+Deser Time (ns)
+
+.image images/serializers.png
+
+* Use something different that JSON
+
+Size, Compressed size [light] in bytes
+
+.image images/size.png
+
+* JSON vs Binary protocols
+
+Pros:
+
+- Schemas Are Awesome
+- Backward Compatibility For Free
+- Less Boilerplate Code
+- Validations and Extensibility
+- Easy Language Interoperability
+
+Cons:
+
+- Not human readable
+- Problem with deserialization in web browser
+
+* HTTP monitoring
+
+* HTTP Monitoring
+
+Good practices:
+
+- Measure everything
+- Set alerts based on the metrics
+- Monitoring should never require a human to interpret any part of the alerting domain
+- Three valid kinds of monitoring output
+    - Alerts: human needs to take action immediately
+    - Tickets: human needs to take action eventually
+    - Logging: no action needed
+- Analytics can use your metrics!
+
+* HTTP monitoring
+
+Key metrics to measure:
+
+- Average Response Time (ART)
+- Requests per Second (RPS)
+- Peak Response Times (PRT)
+- HTTP response time percentiles - 50, 95, 99
+- Error Rates
+- Count of Application Instances
+- CPU utilization
+- Memory utilization
+
+* HTTP monitoring - how to
+
+- Setup monitoring tool
+Options: Prometheus, InfluxDB, OpenTSDB, Nagios or Sensu
+
+- Integrate monitoring with your application
+
+* HTTP monitoring - setup
+
+- Prometheus on minikube:
+
+[[https://github.com/camilb/prometheus-kubernetes/tree/master/basic][https://github.com/camilb/prometheus-kubernetes/tree/master/basic]]
+
+but with some minor change in file: k8s/prometheus/prometheus.svc.ss.yaml
+
+* HTTP monitoring - integration
+
+Demo!
+
+* HTTP Performance tests
+
+* HTTP Performance tests
+
+Best practices:
+
+- Establish monitoring before you start
+- Identify KPIs for application
+- Create realistic test cases
+- Run the load test incrementally
+- Check the scalability of your application
+
+* HTTP Performance tests - types
+
+- Load testing - measures system performance as the workload increases.
+- Stress testing - is meant to measure system performance outside of the parameters of normal working conditions. The software is given more users or transactions that can be handled. At what point does software fail, and how does the software recover from failure?
+- Spike testing - is a type of stress testing that evaluates software performance when workloads are substantially increased quickly.
+- Endurance testing — is an evaluation of how software performs with a normal workload over an extended amount of time.
+- Scalability testing - is used to determine if software is effectively handling increasing workloads.
+- Volume testing - determines how efficiently software performs with a large, projected amounts of data
+
+* HTTP Performance tests
+
+Tools:
+
+- [[http://gatling.io/][http://gatling.io/]]
+- [[http://jmeter.apache.org/][http://jmeter.apache.org/]]
+- [[https://github.com/tsenart/vegeta][https://github.com/tsenart/vegeta]]
+- [[https://github.com/rakyll/boom][https://github.com/rakyll/boom]] / [[https://github.com/rakyll/hey][https://github.com/rakyll/hey]]
+- [[https://github.com/wg/wrk][https://github.com/wg/wrk]]
+
+* Questions ?
